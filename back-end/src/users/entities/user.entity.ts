@@ -16,13 +16,13 @@ export class User extends BaseEntity {
   @Column({
     type: 'varchar',
     length: 255,
+    select: false,
   })
   password!: string;
 
   @Column({
     type: 'varchar',
     length: 100,
-    name: 'name',
   })
   name!: string;
 
