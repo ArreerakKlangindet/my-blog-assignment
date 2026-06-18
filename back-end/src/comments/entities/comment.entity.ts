@@ -1,7 +1,7 @@
 import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
 
 import { BaseEntity } from '../../common/entities/base.entity';
-import { Blog } from '../../blogs/entities/blog.entity';
+import { Blog } from '../../blogs/entities/blogs.entity';
 import { CommentStatus } from '../../common/enums/comment-status.enum';
 
 @Entity('comments')

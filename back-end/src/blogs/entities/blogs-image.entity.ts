@@ -1,7 +1,7 @@
 import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
 
 import { BaseEntity } from '../../common/entities/base.entity';
-import { Blog } from './blog.entity';
+import { Blog } from './blogs.entity';
 
 @Entity('blog_images')
 export class BlogImage extends BaseEntity {

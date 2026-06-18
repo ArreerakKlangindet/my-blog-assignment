@@ -3,8 +3,8 @@ import { Entity, Column, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
 import { BaseEntity } from '../../common/entities/base.entity';
 import { User } from '../../users/entities/user.entity';
 import { Comment } from '../../comments/entities/comment.entity';
-import { BlogImage } from './blog-image.entity';
-import { BlogStatus } from '../../common/enums/blog-status.enum';
+import { BlogImage } from './blogs-image.entity';
+import { BlogStatus } from '../../common/enums/blogs-status.enum';
 
 @Entity('blogs')
 export class Blog extends BaseEntity {
@@ -61,7 +61,9 @@ export class Blog extends BaseEntity {
   })
   author!: User;
 
-  @OneToMany(() => BlogImage, (blogImage) => blogImage.blog)
+  @OneToMany(() => BlogImage, (blogImage) => blogImage.blog, {
+    cascade: true,
+  })
   images!: BlogImage[];
 
   @OneToMany(() => Comment, (comment) => comment.blog)
