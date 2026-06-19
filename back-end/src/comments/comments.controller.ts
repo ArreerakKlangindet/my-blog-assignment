@@ -1,34 +1,67 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { CommentsService } from './comments.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
-import { UpdateCommentDto } from './dto/update-comment.dto';
+import { UpdateCommentStatusDto } from './dto/update-comment-status.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Request } from 'express';
 
-@Controller('comments')
+interface RequestWithUser extends Request {
+  user: {
+    id: string;
+    email: string;
+    role: string;
+  };
+}
+
+@Controller()
 export class CommentsController {
   constructor(private readonly commentsService: CommentsService) {}
 
-  @Post()
-  create(@Body() createCommentDto: CreateCommentDto) {
-    return this.commentsService.create(createCommentDto);
+  // URL: POST /blogs/:blogId/comments
+  @Post('blogs/:blogId/comments')
+  create(
+    @Param('blogId') blogId: string,
+    @Body() createCommentDto: CreateCommentDto,
+    @Req() req: Request,
+  ) {
+    const ipAddress = req.ip || req.socket.remoteAddress || '';
+    return this.commentsService.create(blogId, createCommentDto, ipAddress);
   }
 
-  @Get()
-  findAll() {
-    return this.commentsService.findAll();
+  // URL: GET /blogs/:blogId/comments
+  @Get('blogs/:blogId/comments')
+  findAllByBlog(@Param('blogId') blogId: string) {
+    return this.commentsService.findAllApprovedByBlog(blogId);
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.commentsService.findOne(+id);
+  // URL: GET /admin/comments
+  @Get('admin/comments')
+  @UseGuards(JwtAuthGuard)
+  adminGetComments(@Req() req: RequestWithUser) {
+    return this.commentsService.adminFindAll(req.user.role);
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateCommentDto: UpdateCommentDto) {
-    return this.commentsService.update(+id, updateCommentDto);
-  }
-
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.commentsService.remove(+id);
+  // URL: PATCH /admin/comments/:id/status
+  @Patch('admin/comments/:id/status')
+  @UseGuards(JwtAuthGuard)
+  updateStatus(
+    @Param('id') id: string,
+    @Body() updateStatusDto: UpdateCommentStatusDto,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.commentsService.updateStatus(
+      id,
+      updateStatusDto.status,
+      req.user.role,
+    );
   }
 }
