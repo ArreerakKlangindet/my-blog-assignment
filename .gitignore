@@ -11,3 +11,6 @@
 # IDE
 .vscode/
 .idea/
+
+# Block uploads inside backend from root
+back-end/uploads/

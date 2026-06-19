@@ -1,8 +1,11 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import {
   Injectable,
   Logger,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, ILike, FindOptionsWhere } from 'typeorm';
@@ -10,6 +13,7 @@ import { Blog } from './entities/blogs.entity';
 import { CreateBlogDto } from './dto/create-blog.dto';
 import { UpdateBlogDto } from './dto/update-blog.dto';
 import { BlogStatus } from '../common/enums/blogs-status.enum';
+import { BlogImage } from './entities/blogs-image.entity';
 
 @Injectable()
 export class BlogsService {
@@ -20,9 +24,6 @@ export class BlogsService {
     private readonly blogRepository: Repository<Blog>,
   ) {}
 
-  /**
-   * 📝 4. [Admin] Create a new blog with a cover image and up to 6 additional sub-images
-   */
   async create(createBlogDto: CreateBlogDto, authorId: string) {
     const newBlog = this.blogRepository.create({
       title: createBlogDto.title,
@@ -34,7 +35,6 @@ export class BlogsService {
 
     const savedBlog = await this.blogRepository.save(newBlog);
 
-    // 🛠️ Fixed ESLint @typescript-eslint/no-unsafe-assignment by mapping explicitly without 'any'
     if (
       createBlogDto.additionalImages &&
       createBlogDto.additionalImages.length > 0
@@ -45,7 +45,7 @@ export class BlogsService {
           fileName: `image-${index + 1}`,
           displayOrder: index + 1,
           blogId: savedBlog.id,
-        } as unknown as Blog['images'][number]; // Cast safely using the entity's relation property type
+        } as unknown as Blog['images'][number];
       });
 
       await this.blogRepository.save(savedBlog);
@@ -57,9 +57,6 @@ export class BlogsService {
     return this.findOne(savedBlog.id);
   }
 
-  /**
-   * 🌐 1. Public Blog List (Supports searching by title & pagination limiting 10 items per page)
-   */
   async findAll(search?: string, page: number = 1) {
     const limit = 10;
     const skip = (page - 1) * limit;
@@ -89,9 +86,6 @@ export class BlogsService {
     };
   }
 
-  /**
-   * 🔍 2. Public Blog Detail (Fetches all sub-images and increments viewCount by 1 automatically)
-   */
   async findOne(id: string) {
     const blog = await this.blogRepository.findOne({
       where: { id },
@@ -116,9 +110,6 @@ export class BlogsService {
     return blog;
   }
 
-  /**
-   * ✏️ 4. [Admin] Update blog content or customize URL Slug
-   */
   async update(id: string, updateBlogDto: UpdateBlogDto, authorId: string) {
     const blog = await this.findOne(id);
 
@@ -143,9 +134,6 @@ export class BlogsService {
     return updatedBlog;
   }
 
-  /**
-   * ❌ 4. [Admin] Delete a blog from the database
-   */
   async remove(id: string, authorId: string) {
     const blog = await this.findOne(id);
 
@@ -166,9 +154,6 @@ export class BlogsService {
     return { message: 'Blog deleted successfully' };
   }
 
-  /**
-   * 📢 4. [Admin] Toggle status between PUBLISHED and UNPUBLISHED
-   */
   async togglePublish(id: string, authorId: string) {
     const blog = await this.findOne(id);
 
@@ -188,5 +173,83 @@ export class BlogsService {
       `📢 Blog ID ${id} status changed to: ${updatedBlog.status}`,
     );
     return updatedBlog;
+  }
+
+  async addBlogImages(
+    blogId: string,
+    imageUrls: string[],
+    authorId: string,
+  ): Promise<BlogImage[]> {
+    const blog = await this.findOne(blogId);
+
+    if (blog.authorId !== authorId) {
+      throw new ForbiddenException(
+        'You are not authorized to add images to this blog',
+      );
+    }
+
+    const currentCount = blog.images ? blog.images.length : 0;
+    if (currentCount + imageUrls.length > 6) {
+      throw new BadRequestException(
+        `A blog can have a maximum of 6 additional images. Current: ${currentCount} images, Trying to add: ${imageUrls.length}`,
+      );
+    }
+
+    const savedImages: BlogImage[] = [];
+    let order = currentCount;
+
+    for (const url of imageUrls) {
+      const fileName = url.substring(url.lastIndexOf('/') + 1);
+
+      const newImage = this.blogRepository.manager.create(BlogImage, {
+        fileName: fileName,
+        filePath: url,
+        displayOrder: order + 1,
+        blogId: blogId,
+      });
+
+      const savedImg = await this.blogRepository.manager.save(
+        BlogImage,
+        newImage,
+      );
+      savedImages.push(savedImg);
+      order++;
+    }
+
+    this.logger.log(
+      `✅ Successfully uploaded ${imageUrls.length} images for Blog ID: ${blogId}`,
+    );
+    return savedImages;
+  }
+
+  async removeBlogImage(imageId: string, authorId: string) {
+    const blogImage = await this.blogRepository.manager.findOne(BlogImage, {
+      where: { id: imageId },
+    });
+
+    if (!blogImage) {
+      throw new NotFoundException(`Image with ID "${imageId}" not found`);
+    }
+
+    const blog = await this.findOne(blogImage.blogId);
+    if (blog.authorId !== authorId) {
+      throw new ForbiddenException(
+        'You are not authorized to delete this image',
+      );
+    }
+
+    if (blogImage.fileName) {
+      const filePath = path.join(process.cwd(), 'uploads', blogImage.fileName);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    }
+
+    await this.blogRepository.manager.remove(BlogImage, blogImage);
+
+    this.logger.log(
+      `❌ Successfully deleted sub-image ID: ${imageId} from Blog ID: ${blogImage.blogId}`,
+    );
+    return { message: 'Image deleted successfully' };
   }
 }
