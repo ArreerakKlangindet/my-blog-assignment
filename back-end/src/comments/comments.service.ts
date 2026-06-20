@@ -61,7 +61,9 @@ export class CommentsService {
       );
     }
 
+    // 💡 แก้ไขจุดนี้: เปลี่ยนจาก ['blog'] เป็น { blog: true } เพื่อให้ตรงกับ Type ใน TypeORM จ้า
     return await this.commentRepository.find({
+      relations: { blog: true },
       order: { createdAt: 'DESC' },
     });
   }

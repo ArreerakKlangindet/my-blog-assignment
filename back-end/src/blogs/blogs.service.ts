@@ -57,7 +57,46 @@ export class BlogsService {
     return this.findOne(savedBlog.id);
   }
 
-  async findAll(search?: string, page: number = 1) {
+  // 🛠️ ตัวอย่างการปรับโค้ดฝั่ง NestJS Service ให้รองรับ Pagination
+  async findAll(query: { page?: number; limit?: number; search?: string }) {
+    const page = Number(query.page) || 1;
+    const limit = Number(query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // สร้าง Query Builder หรือใช้ findAndCount
+    const queryBuilder = this.blogRepository
+      .createQueryBuilder('blog')
+      .leftJoinAndSelect('blog.author', 'author')
+      .leftJoinAndSelect('blog.images', 'images')
+      .where('blog.status = :status', {
+        status: BlogStatus.PUBLISHED,
+      });
+
+    // ถ้ามีการส่งคำค้นหามาให้ดักกรองด้วย
+    if (query.search) {
+      queryBuilder.andWhere('blog.title ILIKE :search', {
+        search: `%${query.search}%`,
+      });
+    }
+
+    // 💡 จุดสำคัญ: ทำ Pagination ตรงนี้
+    queryBuilder.skip(skip).take(limit).orderBy('blog.createdAt', 'DESC');
+
+    const [data, total] = await queryBuilder.getManyAndCount();
+
+    // 💡 คืนค่ากลับไปเป็น Object ที่มีทั้ง data และ total เพื่อให้หน้าบ้านเอาไปคำนวณปุ่มกด
+    return {
+      data,
+      meta: {
+        totalItems: total,
+        currentPage: page,
+        itemsPerPage: limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async findAllForAdmin(search?: string, page: number = 1) {
     const limit = 10;
     const skip = (page - 1) * limit;
 
@@ -89,7 +128,7 @@ export class BlogsService {
   async findOne(id: string) {
     const blog = await this.blogRepository.findOne({
       where: { id },
-      relations: { author: true, images: true },
+      relations: { author: true, images: true, comments: true },
     });
 
     if (!blog) {
@@ -100,11 +139,21 @@ export class BlogsService {
     return blog;
   }
 
-  async findOnePublic(id: string) {
-    const blog = await this.findOne(id);
+  async findOnePublic(slug: string) {
+    const blog = await this.blogRepository.findOne({
+      where: {
+        slug: slug.toLowerCase().trim(),
+        status: BlogStatus.PUBLISHED,
+      },
+      relations: { author: true, images: true, comments: true },
+    });
+
+    if (!blog) {
+      this.logger.warn(`⚠️ Fetch Public failed: Blog Slug ${slug} not found`);
+      throw new NotFoundException(`Blog with Slug "${slug}" not found`);
+    }
 
     blog.viewCount += 1;
-
     await this.blogRepository.save(blog);
 
     return blog;

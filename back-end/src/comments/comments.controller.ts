@@ -50,6 +50,11 @@ export class CommentsController {
     return this.commentsService.adminFindAll(req.user.role);
   }
 
+  @Get('comments')
+  devGetComments() {
+    return this.commentsService.adminFindAll('ADMIN');
+  }
+
   // URL: PATCH /admin/comments/:id/status
   @Patch('admin/comments/:id/status')
   @UseGuards(JwtAuthGuard)

@@ -48,18 +48,45 @@ export class BlogsController {
   }
 
   @Get()
-  findAll(@Query('search') search?: string, @Query('page') page?: string) {
+  findAll(
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
     const pageNumber = page ? parseInt(page, 10) : 1;
+    const limitNumber = limit ? parseInt(limit, 10) : 10;
+
     this.logger.log(
       `🌐 Fetching blogs - Search Query: "${search || 'none'}", Page: ${pageNumber}`,
     );
-    return this.blogsService.findAll(search, pageNumber);
+
+    return this.blogsService.findAll({
+      search,
+      page: pageNumber,
+      limit: limitNumber,
+    });
+  }
+
+  @Get('admin/all')
+  @UseGuards(JwtAuthGuard)
+  findAllAdmin(@Query('search') search?: string, @Query('page') page?: string) {
+    const pageNumber = page ? parseInt(page, 10) : 1;
+    this.logger.log(
+      `👑 Admin Fetching ALL blogs - Search: "${search || 'none'}", Page: ${pageNumber}`,
+    );
+    return this.blogsService.findAllForAdmin(search, pageNumber);
+  }
+
+  @Get('public/:slug')
+  findOneBySlug(@Param('slug') slug: string) {
+    this.logger.log(`🌐 Fetching blog with Slug: ${slug}`);
+    return this.blogsService.findOnePublic(slug);
   }
 
   @Get(':id')
   findOne(@Param('id') id: string) {
     this.logger.log(`🌐 Fetching blog with ID: ${id}`);
-    return this.blogsService.findOnePublic(id);
+    return this.blogsService.findOne(id);
   }
 
   @Patch(':id')
@@ -131,9 +158,7 @@ export class BlogsController {
     const authorId = req.user.id;
 
     // 🛠️ ปรับลอจิกการเข้าถึงให้ปลอดภัยร้อยเปอร์เซ็นต์ตามกฎ ESLint
-    const imageUrls = files.map(
-      (file) => `http://localhost:3000/uploads/${file.filename}`,
-    );
+    const imageUrls = files.map((file) => `/uploads/${file.filename}`);
 
     const imagesResult = await this.blogsService.addBlogImages(
       id,

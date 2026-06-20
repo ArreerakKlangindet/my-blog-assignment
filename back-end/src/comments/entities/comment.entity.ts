@@ -1,5 +1,4 @@
 import { Entity, Column, ManyToOne, JoinColumn } from 'typeorm';
-
 import { BaseEntity } from '../../common/entities/base.entity';
 import { Blog } from '../../blogs/entities/blogs.entity';
 import { CommentStatus } from '../../common/enums/comment-status.enum';
@@ -31,6 +30,11 @@ export class Comment extends BaseEntity {
   })
   blogId!: string;
 
+  // 💡 ตัวแปรสัมพันธ์มีแค่จุดนี้จุดเดียว ไม่ซ้ำซ้อนแล้วจ้า
+  @ManyToOne(() => Blog, (blog) => blog.comments, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'blog_id' })
+  blog!: Blog;
+
   @Column({
     type: 'varchar',
     length: 45,
@@ -38,12 +42,4 @@ export class Comment extends BaseEntity {
     nullable: true,
   })
   ipAddress?: string | null;
-
-  @ManyToOne(() => Blog, (blog) => blog.comments, {
-    onDelete: 'CASCADE',
-  })
-  @JoinColumn({
-    name: 'blog_id',
-  })
-  blog!: Blog;
 }
