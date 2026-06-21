@@ -16,28 +16,37 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      // 🛠️ ยิง API ไปที่ NestJS หลังบ้านพอร์ต 5000 ตามโครงสร้างระบบของหนู
       const res = await fetch("http://localhost:5000/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
+        // 🛠️ ส่งคีย์เป็น email และ password ตามที่ Validator ของหลังบ้านกำหนดไว้เป๊ะ ๆ
         body: JSON.stringify({ email, password }),
       });
 
       const data = await res.json();
+      console.log("📦 ข้อมูลที่ NestJS ส่งกลับมา:", data); // เอาไว้กด F12 ตรวจสอบของจริงได้บนเบราว์เซอร์
 
       if (!res.ok) {
         throw new Error(data.message || "อีเมลหรือรหัสผ่านไม่ถูกต้อง");
       }
 
-      // Save token to localStorage
-      localStorage.setItem("admin_token", data.accessToken);
+      // 🛠️ ตรวจสอบแกะคีย์ Token ให้ครอบคลุมทุกรูปแบบ (ทั้งแบบ camelCase และ snake_case)
+      const token = data.access_token || data.accessToken || data.token;
 
-      // Redirect to admin comments management
-      router.push("/admin/comments");
-      router.refresh();
+      if (token) {
+        // บันทึก Token ลงเครื่องด้วยคีย์ 'token' เพื่อให้ฟังก์ชัน apiRequest / หน้าอื่น ๆ ดึงไปใช้งานต่อได้ง่าย
+        localStorage.setItem("token", token);
+
+        // 🚀 ดีดหน้าแอดมินข้ามฝั่งไปที่หน้าจัดการบทความทันที
+        router.push("/admin/blogs");
+        router.refresh();
+      } else {
+        throw new Error("ล็อกอินสำเร็จ แต่เซิร์ฟเวอร์ไม่ได้ส่ง Token กลับมา");
+      }
     } catch (err) {
-      // 💡 [แก้ไขจุดสำคัญ]: เปลี่ยนมาเช็คและแกะข้อความ Error แบบปลอดภัยตามหลัก TypeScript
       if (err instanceof Error) {
         setError(err.message);
       } else {

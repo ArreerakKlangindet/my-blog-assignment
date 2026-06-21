@@ -43,7 +43,8 @@ export default function AdminCommentsPage() {
         setLoading(true);
         setError(null);
 
-        const token = localStorage.getItem("admin_token");
+        // 🛠️ [แก้ไขจุดสำคัญ]: เปลี่ยนคีย์จาก "admin_token" เป็น "token" ให้ซิงค์ตรงกับหน้า Login
+        const token = localStorage.getItem("token");
         if (!token) {
           router.push("/login");
           return;
@@ -59,7 +60,8 @@ export default function AdminCommentsPage() {
         });
 
         if (res.status === 401) {
-          localStorage.removeItem("admin_token");
+          // 🛠️ [แก้ไขจุดสำคัญ]: เคลียร์คีย์ "token" ออกให้ถูกต้องหาก Token หมดอายุ
+          localStorage.removeItem("token");
           router.push("/login");
           return;
         }
@@ -102,7 +104,8 @@ export default function AdminCommentsPage() {
     setConfirmModal((prev) => ({ ...prev, isOpen: false }));
 
     try {
-      const token = localStorage.getItem("admin_token");
+      // 🛠️ [แก้ไขจุดสำคัญ]: เปลี่ยนคีย์จาก "admin_token" เป็น "token"
+      const token = localStorage.getItem("token");
       if (!token) {
         router.push("/login");
         return;

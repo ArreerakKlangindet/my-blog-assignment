@@ -16,7 +16,7 @@ export interface BlogImage {
   id: string;
   fileName: string;
   filePath: string;
-  displayOrder: number;
+  displayOrder?: number;
 }
 
 export interface CommentData {
@@ -37,4 +37,8 @@ export interface PaginationMeta {
 export interface BlogPaginatedResponse {
   data: Blog[];
   meta: PaginationMeta;
+}
+
+export interface EditBlogPageProps {
+  params: Promise<{ id: string }>;
 }
