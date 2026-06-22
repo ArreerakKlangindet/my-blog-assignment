@@ -1,4 +1,6 @@
 import Link from "next/link";
+// 🎯 Import ปุ่มออกจากระบบที่เราแยก Component ไว้เข้ามาใช้งาน
+import LogoutButton from "@/components/admin/LogoutButton";
 
 export default function AdminLayout({
   children,
@@ -43,10 +45,14 @@ export default function AdminLayout({
 
       {/* 📦 พื้นที่แสดงเนื้อหาของแต่ละหน้า (Main Content Area) */}
       <div className="flex-1 flex flex-col overflow-hidden">
+        {/* หัวด้านบนปรับเป็น Flexbox แบ่งซ้าย-ขวา */}
         <header className="bg-white h-16 border-b flex items-center justify-between px-8 shadow-sm">
           <div className="text-sm font-medium text-gray-500">
             ยินดีต้อนรับผู้ดูแลระบบ 👤
           </div>
+
+          {/* 🎯 แปะปุ่มออกจากระบบไว้ฝั่งขวาของ Header สวยงาม เด่นชัด */}
+          <LogoutButton />
         </header>
 
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6 md:p-8">

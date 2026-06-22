@@ -3,31 +3,37 @@
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import Link from "next/link";
-import { Blog, BlogImage } from "@/types/blog";
+import NextLink from "next/link";
+// 🎯 จุดที่ 1: ดึง UpdateBlogPayload มาจากไฟล์ส่วนกลางที่คุณจัดระเบียบไว้โดยตรง
+import { Blog, BlogImage, UpdateBlogPayload } from "@/types/blog";
 
 interface EditBlogPageProps {
   params: Promise<{ id: string }>;
 }
+
+// ❌ จุดที่เคยเป็น interface UpdateBlogPayload ถูกลบออกไปเรียบร้อยแล้วเพื่อความสะอาด
 
 export default function EditBlogPage({ params }: EditBlogPageProps) {
   const { id: blogId } = use(params);
   const router = useRouter();
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
-  // States เก็บข้อมูลฟอร์ม
+  // เก็บข้อมูลดั้งเดิมเพื่อเอาไว้เช็ก Diff ก่อนกดยืนยันบันทึก
+  const [originalBlog, setOriginalBlog] = useState<Blog | null>(null);
+
+  // States สำหรับควบคุมฟอร์ม
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
   const [content, setContent] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
+
+  // 🎯 บังคับใช้ Array ของ BlogImage จากไฟล์ไทป์กลางโดยตรง
   const [additionalImages, setAdditionalImages] = useState<BlogImage[]>([]);
 
-  // States จัดการ UI
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 1. ดึงข้อมูลบล็อกดั้งเดิมจาก API
   useEffect(() => {
     const fetchBlogDetail = async () => {
       try {
@@ -46,9 +52,12 @@ export default function EditBlogPage({ params }: EditBlogPageProps) {
         if (!res.ok) throw new Error("ไม่สามารถดึงข้อมูลบทความนี้ได้");
 
         const data: Blog = await res.json();
-        setTitle(data.title);
-        setSlug(data.slug);
-        setContent(data.content);
+        setOriginalBlog(data);
+
+        // นำข้อมูลเข้าสู่ State
+        setTitle(data.title || "");
+        setSlug(data.slug || "");
+        setContent(data.content || "");
         setCoverImageUrl(data.coverImageUrl || null);
         setAdditionalImages(data.images || []);
       } catch (err) {
@@ -64,7 +73,6 @@ export default function EditBlogPage({ params }: EditBlogPageProps) {
     fetchBlogDetail();
   }, [blogId, API_URL, router]);
 
-  // 2. แปลงไฟล์รูปภาพปกเป็น Base64
   const handleCoverImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -76,7 +84,6 @@ export default function EditBlogPage({ params }: EditBlogPageProps) {
     reader.readAsDataURL(file);
   };
 
-  // 3. อัปเดตไฟล์ภาพย่อยเข้า API เซิร์ฟเวอร์
   const handleAdditionalImagesUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
@@ -103,6 +110,7 @@ export default function EditBlogPage({ params }: EditBlogPageProps) {
       }
 
       const result = await res.json();
+      // เซ็ตกลับด้วยรูปแบบข้อมูลรูปภาพชุดใหม่ที่ส่งกลับมาจากหลังบ้าน
       setAdditionalImages(result.images || []);
       alert("✨ อัปเดตเพิ่มรูปภาพประกอบสำเร็จ!");
     } catch (err) {
@@ -114,7 +122,6 @@ export default function EditBlogPage({ params }: EditBlogPageProps) {
     }
   };
 
-  // 4. ลบไฟล์ภาพย่อยรายชิ้นออกจากเซิร์ฟเวอร์
   const handleDeleteSubImage = async (imageId: string) => {
     if (!confirm("คุณต้องการลบรูปภาพประกอบนี้ใช่หรือไม่?")) return;
 
@@ -136,7 +143,6 @@ export default function EditBlogPage({ params }: EditBlogPageProps) {
     }
   };
 
-  // 5. บันทึกข้อมูล
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -149,18 +155,38 @@ export default function EditBlogPage({ params }: EditBlogPageProps) {
     }
 
     try {
+      // 🎯 จุดที่ 2: เรียกใช้ UpdateBlogPayload ของไฟล์กลางได้อย่างปลอดภัย ไร้รอยต่อ
+      const updatePayload: UpdateBlogPayload = {};
+
+      if (title !== originalBlog?.title) updatePayload.title = title;
+
+      const formattedSlug = slug
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-zA-Z0-9ก-๙_-]/g, "")
+        .replace(/\s+/g, "-");
+
+      if (formattedSlug !== originalBlog?.slug)
+        updatePayload.slug = formattedSlug;
+      if (content !== originalBlog?.content) updatePayload.content = content;
+
+      if (coverImageUrl !== originalBlog?.coverImageUrl) {
+        updatePayload.coverImageUrl = coverImageUrl;
+      }
+
+      if (Object.keys(updatePayload).length === 0) {
+        alert("ℹ️ ไม่พบข้อมูลที่มีการเปลี่ยนแปลง");
+        setSubmitting(false);
+        return;
+      }
+
       const res = await fetch(`${API_URL}/blogs/${blogId}`, {
         method: "PATCH",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          title,
-          slug: slug.toLowerCase().trim(),
-          content,
-          coverImageUrl,
-        }),
+        body: JSON.stringify(updatePayload),
       });
 
       if (!res.ok) {
@@ -173,7 +199,7 @@ export default function EditBlogPage({ params }: EditBlogPageProps) {
         );
       }
 
-      alert("🎉 บันทึกการแก้ไขบทความสำเร็จเรียบร้อย!");
+      alert("🎉 บันทึกการแก้ไขข้อมูลสำเร็จเรียบร้อย!");
       router.push("/admin/blogs");
       router.refresh();
     } catch (err) {
@@ -182,6 +208,16 @@ export default function EditBlogPage({ params }: EditBlogPageProps) {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setTitle(val);
+    const generatedSlug = val
+      .toLowerCase()
+      .replace(/[^a-zA-Z0-9ก-๙\s_-]/g, "")
+      .replace(/\s+/g, "-");
+    setSlug(generatedSlug);
   };
 
   if (loading) {
@@ -194,15 +230,16 @@ export default function EditBlogPage({ params }: EditBlogPageProps) {
     );
   }
 
-  const finalCoverSrc = coverImageUrl
-    ? coverImageUrl.startsWith("data:") || coverImageUrl.startsWith("http")
-      ? coverImageUrl
-      : `${API_URL}${coverImageUrl}`
-    : null;
+  // ประกอบ Path รูปหน้าปก
+  const finalCoverSrc =
+    coverImageUrl && typeof coverImageUrl === "string"
+      ? coverImageUrl.startsWith("data:") || coverImageUrl.startsWith("http")
+        ? coverImageUrl
+        : `${API_URL}${coverImageUrl.startsWith("/") ? coverImageUrl : `/${coverImageUrl}`}`
+      : null;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 p-4">
-      {/* Header */}
       <div className="border-b pb-4">
         <h1 className="text-xl font-bold text-gray-900">✏️ แก้ไขบทความ</h1>
         <p className="text-xs text-gray-600 mt-1 font-medium">
@@ -220,9 +257,9 @@ export default function EditBlogPage({ params }: EditBlogPageProps) {
         onSubmit={handleSubmit}
         className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6 space-y-6"
       >
-        {/* โซนที่ 1: การจัดการรูปภาพทั้งหมด (อยู่ต่อกันตามที่ต้องการ) */}
+        {/* ส่วนจัดการรูปภาพ */}
         <div className="bg-gray-50/50 p-4 rounded-2xl border border-gray-100 space-y-5">
-          {/* รูปภาพปกบทความ */}
+          {/* 1. รูปภาพปกหลัก */}
           <div className="space-y-2">
             <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider">
               1. รูปภาพปกบทความ
@@ -259,7 +296,7 @@ export default function EditBlogPage({ params }: EditBlogPageProps) {
 
           <div className="border-t border-gray-200/60 my-2"></div>
 
-          {/* รูปภาพประกอบเพิ่มเติม (ย้ายขึ้นมาต่อกันแล้ว!) */}
+          {/* 2. รูปภาพประกอบเพิ่มเติม */}
           <div className="space-y-3">
             <div>
               <label className="block text-xs font-bold text-gray-800 uppercase tracking-wider">
@@ -269,7 +306,6 @@ export default function EditBlogPage({ params }: EditBlogPageProps) {
                 อัปโหลดไฟล์ภาพจริงเก็บเข้าฐานข้อมูลหลังบ้าน
               </p>
             </div>
-
             <input
               type="file"
               multiple
@@ -281,38 +317,60 @@ export default function EditBlogPage({ params }: EditBlogPageProps) {
 
             {additionalImages.length > 0 && (
               <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 pt-1">
-                {additionalImages.map((img) => (
-                  <div
-                    key={img.id}
-                    className="group relative aspect-video rounded-lg overflow-hidden border border-gray-200 bg-white shadow-sm"
-                  >
-                    <Image
-                      src={
-                        img.filePath.startsWith("http")
-                          ? img.filePath
-                          : `${API_URL}${img.filePath}`
-                      }
-                      alt={img.fileName}
-                      fill
-                      className="object-cover"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteSubImage(img.id)}
-                      className="absolute inset-0 bg-red-600/90 text-white text-[10px] font-bold opacity-0 group-hover:opacity-100 flex items-center justify-center transition duration-150"
+                {additionalImages.map((img) => {
+                  const rawPath = img.filePath || "";
+
+                  let subImgSrc = "";
+                  if (rawPath && typeof rawPath === "string") {
+                    if (
+                      rawPath.startsWith("http://") ||
+                      rawPath.startsWith("https://") ||
+                      rawPath.startsWith("data:")
+                    ) {
+                      subImgSrc = rawPath;
+                    } else {
+                      const cleanPath = rawPath.startsWith("/")
+                        ? rawPath
+                        : `/${rawPath}`;
+                      subImgSrc = `${API_URL}${cleanPath}`;
+                    }
+                  }
+
+                  return (
+                    <div
+                      key={img.id}
+                      className="group relative aspect-video rounded-lg overflow-hidden border border-gray-200 bg-white shadow-sm"
                     >
-                      🗑️ ลบรูปนี้
-                    </button>
-                  </div>
-                ))}
+                      {subImgSrc ? (
+                        <Image
+                          src={subImgSrc}
+                          alt={img.fileName || "Sub Image"}
+                          fill
+                          unoptimized
+                          className="object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gray-100 flex items-center justify-center text-[9px] text-gray-400">
+                          ไม่มีพาธรูปภาพ
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteSubImage(img.id)}
+                        className="absolute inset-0 bg-red-600/90 text-white text-[10px] font-bold opacity-0 group-hover:opacity-100 flex items-center justify-center transition duration-150"
+                      >
+                        🗑️ ลบรูปนี้
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
         </div>
 
-        {/* โซนที่ 2: กรอกข้อมูลตัวอักษร (ปรับสีเข้มขึ้นชัดเจน) */}
+        {/* ส่วนอินพุตเนื้อหาข้อมูล */}
         <div className="space-y-4">
-          {/* ชื่อบทความ */}
           <div className="space-y-1">
             <label className="block text-xs font-bold text-gray-800">
               ชื่อบทความ (Title)
@@ -321,13 +379,12 @@ export default function EditBlogPage({ params }: EditBlogPageProps) {
               type="text"
               required
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={handleTitleChange}
               className="w-full px-4 py-2.5 border border-gray-300 rounded-xl text-sm text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-medium"
               placeholder="กรอกชื่อบทความ..."
             />
           </div>
 
-          {/* URL Slug */}
           <div className="space-y-1">
             <label className="block text-xs font-bold text-gray-800">
               URL Slug
@@ -342,7 +399,6 @@ export default function EditBlogPage({ params }: EditBlogPageProps) {
             />
           </div>
 
-          {/* เนื้อหาบทความ */}
           <div className="space-y-1">
             <label className="block text-xs font-bold text-gray-800">
               เนื้อหาบทความ (Content)
@@ -358,15 +414,14 @@ export default function EditBlogPage({ params }: EditBlogPageProps) {
           </div>
         </div>
 
-        {/* ปุ่มแอ็กชันด้านล่าง (ย้ายปุ่มย้อนกลับมาประกบคู่ข้างซ้ายแล้ว!) */}
+        {/* ส่วนปุ่มควบคุมท้ายหน้า */}
         <div className="border-t border-gray-200 pt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <Link
+          <NextLink
             href="/admin/blogs"
             className="w-full sm:w-auto px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold rounded-xl transition text-center border border-gray-200"
           >
             ⬅️ ย้อนกลับหน้ารายการบทความ
-          </Link>
-
+          </NextLink>
           <button
             type="submit"
             disabled={submitting}

@@ -42,3 +42,10 @@ export interface BlogPaginatedResponse {
 export interface EditBlogPageProps {
   params: Promise<{ id: string }>;
 }
+
+export interface UpdateBlogPayload {
+  title?: string;
+  slug?: string;
+  content?: string;
+  coverImageUrl?: string | null;
+}

@@ -9,6 +9,7 @@ import ErrorState from "@/components/blog/ErrorState";
 import EmptyState from "@/components/blog/EmptyState";
 import BlogGrid from "@/components/blog/BlogGrid";
 import Pagination from "@/components/blog/Pagination";
+import AdminLoginButton from "@/components/blog/AdminLoginButton";
 
 export default function BlogListPage() {
   const {
@@ -27,6 +28,8 @@ export default function BlogListPage() {
     <div className="min-h-screen bg-gray-50 text-gray-900 pb-20 w-full">
       {/* ส่วนบนหัวเว็บไซต์ (Header) */}
       <header className="bg-white border-b py-12 text-center shadow-sm">
+        <AdminLoginButton />
+
         <HeroSection />
         <SearchBar value={searchQuery} onChange={setSearchQuery} />
       </header>
