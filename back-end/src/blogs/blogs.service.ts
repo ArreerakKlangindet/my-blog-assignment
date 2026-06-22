@@ -29,7 +29,11 @@ export class BlogsService {
       title: createBlogDto.title,
       content: createBlogDto.content,
       slug: createBlogDto.slug.toLowerCase().trim(),
-      coverImageUrl: createBlogDto.coverImageUrl || null,
+      coverImageUrl: createBlogDto.coverImageUrl
+        ? createBlogDto.coverImageUrl.startsWith('/')
+          ? createBlogDto.coverImageUrl.replace(/\\/g, '/')
+          : '/' + createBlogDto.coverImageUrl.replace(/\\/g, '/')
+        : null,
       authorId: authorId,
     });
 
@@ -173,6 +177,12 @@ export class BlogsService {
 
     if (updateBlogDto.slug) {
       updateBlogDto.slug = updateBlogDto.slug.toLowerCase().trim();
+    }
+
+    if (updateBlogDto.coverImageUrl) {
+      updateBlogDto.coverImageUrl = updateBlogDto.coverImageUrl.startsWith('/')
+        ? updateBlogDto.coverImageUrl.replace(/\\/g, '/')
+        : '/' + updateBlogDto.coverImageUrl.replace(/\\/g, '/');
     }
 
     Object.assign(blog, updateBlogDto);

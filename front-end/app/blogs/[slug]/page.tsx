@@ -25,6 +25,7 @@ export default function BlogDetailPage({ params }: BlogDetailProps) {
 
   useEffect(() => {
     async function fetchBlogAndIncrementView() {
+      // 🛠️ ปรับปรุงบล็อกแกะข้อมูล JSON ในไฟล์ app/blogs/[slug]/page.tsx
       try {
         setFetchError(false);
         const res = await fetch(`${API_URL}/blogs/public/${slug}`);
@@ -33,8 +34,18 @@ export default function BlogDetailPage({ params }: BlogDetailProps) {
           throw new Error(`เซิร์ฟเวอร์ตอบกลับด้วยสเตตัส: ${res.status}`);
         }
 
-        const data = await res.json();
-        setBlog(data);
+        const resData = await res.json();
+
+        // แกะกล่องเช็กโครงสร้างข้อมูล: ถ้าหลังบ้านส่ง nested object มาในชื่อ .data หรือ .blog ให้ดึงเฉพาะตัวในมาใช้งาน
+        if (resData && typeof resData === "object") {
+          if ("data" in resData && resData.data) {
+            setBlog(resData.data as Blog);
+          } else if ("blog" in resData && resData.blog) {
+            setBlog(resData.blog as Blog);
+          } else {
+            setBlog(resData as Blog); // หากส่งมาเป็นวัตถุชั้นเดียวตรงๆ
+          }
+        }
       } catch (err) {
         console.error("❌ ดึงข้อมูลรายละเอียดล้มเหลว:", err);
         setFetchError(true);
