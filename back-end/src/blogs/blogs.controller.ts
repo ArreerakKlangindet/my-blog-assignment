@@ -12,6 +12,7 @@ import {
   Logger,
   UseInterceptors,
   UploadedFiles,
+  UploadedFile,
   BadRequestException,
 } from '@nestjs/common';
 import { BlogsService } from './blogs.service';
@@ -19,7 +20,7 @@ import { CreateBlogDto } from './dto/create-blog.dto';
 import { UpdateBlogDto } from './dto/update-blog.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Request } from 'express';
-import { FilesInterceptor } from '@nestjs/platform-express';
+import { FilesInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
 
@@ -170,6 +171,58 @@ export class BlogsController {
       message: 'Additional images uploaded and saved successfully',
       count: imagesResult.length,
       images: imagesResult,
+    };
+  }
+
+  @Post(':id/upload-cover')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(
+    FileInterceptor('coverImage', {
+      storage: diskStorage({
+        destination: './uploads',
+        filename: (req, file, callback) => {
+          const uniqueSuffix =
+            Date.now() + '-' + Math.round(Math.random() * 1e9);
+
+          const ext = extname(file.originalname);
+
+          callback(null, `cover-${uniqueSuffix}${ext}`);
+        },
+      }),
+      fileFilter: (req, file, callback) => {
+        if (!file.mimetype.match(/\/(jpg|jpeg|png|webp)$/)) {
+          return callback(
+            new BadRequestException('Only image files are allowed!'),
+            false,
+          );
+        }
+
+        callback(null, true);
+      },
+    }),
+  )
+  async uploadCoverImage(
+    @Param('id') id: string,
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: RequestWithUser,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    const authorId = req.user.id;
+
+    const imageUrl = `/uploads/${file.filename}`;
+
+    const blog = await this.blogsService.updateCoverImage(
+      id,
+      imageUrl,
+      authorId,
+    );
+
+    return {
+      message: 'Cover image uploaded successfully',
+      coverImageUrl: blog.coverImageUrl,
     };
   }
 

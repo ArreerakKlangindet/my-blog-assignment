@@ -1,9 +1,9 @@
 import {
   IsNotEmpty,
   IsString,
-  IsOptional,
   IsArray,
   ArrayMaxSize,
+  ArrayMinSize,
   Length,
   Matches,
 } from 'class-validator';
@@ -21,22 +21,29 @@ export class CreateBlogDto {
   @IsNotEmpty({ message: 'Slug is required' })
   @IsString({ message: 'Slug must be a string' })
   @Length(3, 255, { message: 'Slug must be between 3 and 255 characters' })
-  @Matches(/^[a-zA-Z0-9ก-๙_-]+$/, {
+  @Matches(/^[a-zA-Z0-9_-]+$/, {
     message:
       'Slug must contain only alphanumeric characters, underscores or hyphens',
   })
   slug!: string;
 
-  @IsOptional()
+  @IsNotEmpty({
+    message: 'กรุณาอัปโหลดรูปภาพปกบทความ (Cover image is required)',
+  })
   @IsString({ message: 'Cover image URL must be a string' })
-  coverImageUrl?: string;
+  coverImageUrl!: string;
 
-  @IsOptional()
+  @IsNotEmpty({
+    message: 'กรุณาอัปโหลดรูปภาพประกอบเพิ่มเติมอย่างน้อย 1 รูป',
+  })
   @IsArray({ message: 'Additional images must be an array of strings' })
   @IsString({
     each: true,
     message: 'Each additional image URL must be a string',
   })
-  @ArrayMaxSize(6, { message: 'You can add at most 6 additional images' })
-  additionalImages?: string[];
+  @ArrayMinSize(1, {
+    message: 'ต้องมีรูปภาพประกอบเพิ่มเติมอย่างน้อย 1 รูป',
+  })
+  @ArrayMaxSize(6, { message: 'Maximum 6 additional images allowed' })
+  additionalImages!: string[];
 }

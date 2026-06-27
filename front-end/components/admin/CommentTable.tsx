@@ -91,31 +91,30 @@ export default function CommentTable({
                 {/* 5. ปุ่มสวิตช์กลมเลื่อน (Toggle Switch) สวยๆ */}
                 <td className="py-4 px-6 text-center whitespace-nowrap">
                   <div className="flex items-center justify-center">
+                    {/* แก้ไขปุ่มสลับสถานะใน CommentTable.tsx ให้สไตล์เหมือน BlogTable */}
                     <button
+                      type="button"
                       onClick={() => {
-                        // สลับสถานะไปมา: ถ้าตอนนี้เป็น APPROVED ให้สับเป็น REJECTED, นอกนั้นให้เป็น APPROVED
+                        // Logic เดิมของพี่: ถ้าไม่ใช่ APPROVED ให้ปรับเป็น APPROVED / ถ้าเป็น APPROVED ให้ปรับเป็น REJECTED
                         const nextStatus =
-                          comment.status === "APPROVED"
-                            ? "REJECTED"
-                            : "APPROVED";
+                          comment.status !== "APPROVED"
+                            ? "APPROVED"
+                            : "REJECTED";
                         onUpdateStatus(comment.id, nextStatus);
                       }}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 ${
                         comment.status === "APPROVED"
-                          ? "bg-emerald-500 focus:ring-emerald-500"
-                          : comment.status === "REJECTED"
-                            ? "bg-rose-400 focus:ring-rose-500"
-                            : "bg-gray-200 focus:ring-amber-500" // เคส PENDING
+                          ? "bg-indigo-600"
+                          : "bg-gray-200"
                       }`}
                     >
-                      {/* ปุ่มกลมๆ ด้านในที่จะเลื่อนซ้าย-ขวา */}
+                      <span className="sr-only">สลับสถานะคอมเมนต์</span>
                       <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-300 shadow-sm ${
+                        aria-hidden="true"
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
                           comment.status === "APPROVED"
-                            ? "translate-x-6"
-                            : comment.status === "REJECTED"
-                              ? "translate-x-1"
-                              : "translate-x-3.5" // อยู่ตรงกลางสวยๆ ตอนรอตรวจ
+                            ? "translate-x-5"
+                            : "translate-x-0"
                         }`}
                       />
                     </button>
