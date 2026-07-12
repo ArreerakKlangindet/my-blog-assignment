@@ -6,6 +6,7 @@ import {
   ArrayMinSize,
   Length,
   Matches,
+  IsOptional,
 } from 'class-validator';
 
 export class CreateBlogDto {
@@ -30,12 +31,14 @@ export class CreateBlogDto {
   @IsNotEmpty({
     message: 'กรุณาอัปโหลดรูปภาพปกบทความ (Cover image is required)',
   })
+  @IsOptional()
   @IsString({ message: 'Cover image URL must be a string' })
   coverImageUrl!: string;
 
   @IsNotEmpty({
     message: 'กรุณาอัปโหลดรูปภาพประกอบเพิ่มเติมอย่างน้อย 1 รูป',
   })
+  @IsOptional()
   @IsArray({ message: 'Additional images must be an array of strings' })
   @IsString({
     each: true,

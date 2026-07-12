@@ -32,6 +32,7 @@ export default function BlogFormContainer({
   const [coverImageUrl, setCoverImageUrl] = useState<string | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [additionalImages, setAdditionalImages] = useState<BlogImage[]>([]);
+  const [deletedImageIds, setDeletedImageIds] = useState<string[]>([]);
 
   // โหมดสร้างใหม่ (Create) และรูปแอดเพิ่มโหมดแก้ไข
   const [subFiles, setSubFiles] = useState<File[]>([]);
@@ -45,15 +46,17 @@ export default function BlogFormContainer({
       setContent(initialData.content || "");
       setCoverImageUrl(initialData.coverImageUrl || null);
       setAdditionalImages(initialData.images || []);
+      setDeletedImageIds([]);
     }
   }, [isEditMode, initialData]);
 
-  // 🔒 ฟังก์ชัน Clean Slug กรองให้เหลือแค่ Eng, ตัวเลข, -, _ (ห้ามภาษาไทย 100%)
   const cleanSlugValue = (val: string): string => {
     return val
       .toLowerCase()
-      .replace(/[^a-z0-9_-]/g, "") // ตัดสระ พยัญชนะไทย และอักขระพิเศษออกทั้งหมด
-      .replace(/\s+/g, "-"); // เปลี่ยนช่องว่างเว้นวรรคเป็นเครื่องหมายขีดกลาง
+      .trim()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9_-]/g, "")
+      .replace(/-+/g, "-");
   };
 
   const handleTitleChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -98,50 +101,42 @@ export default function BlogFormContainer({
     e.target.value = "";
   };
 
-  // 🟢 จัดการลบรูปภาพย่อยแบบมี Alert ถามย้ำทั้งรูปเก่าบนเซิร์ฟเวอร์ และรูปพรีวิวเลือกใหม่
-  const handleRemoveSubImage = async (index: number, imageId?: string) => {
-    const token = localStorage.getItem("token");
-
-    // เคสที่ 1: ลบรูปย่อยชุดเก่า ที่มีอยู่เดิมบนเซิร์ฟเวอร์ (โหมดแก้ไข)
+  const handleRemoveSubImage = (index: number, imageId?: string) => {
+    // รูปเก่าที่มีอยู่ใน Backend
     if (isEditMode && imageId && index < additionalImages.length) {
       const isConfirmed = window.confirm(
-        "⚠️ คุณต้องการลบรูปภาพประกอบย่อยนี้ออกจากเซิร์ฟเวอร์อย่างถาวรใช่หรือไม่? (การลบนี้จะส่งผลทันที)",
+        "⚠️ ต้องการนำรูปภาพประกอบนี้ออกหรือไม่? รูปจะถูกลบจริงเมื่อกดบันทึกการแก้ไข",
       );
 
       if (!isConfirmed) return;
 
-      try {
-        // แก้ไขพาธเส้นทางเป็น /blogs/images/:imageId (เติม s) ให้ตรงสเปกตาม Log หลังบ้าน
-        const res = await fetch(`${API_URL}/blogs/images/${imageId}`, {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+      setDeletedImageIds((prev) =>
+        prev.includes(imageId) ? prev : [...prev, imageId],
+      );
 
-        if (!res.ok) {
-          throw new Error("ลบรูปภาพประกอบออกจากเซิร์ฟเวอร์ไม่สำเร็จ");
-        }
+      setAdditionalImages((prev) =>
+        prev.filter((_, imageIndex) => imageIndex !== index),
+      );
 
-        setAdditionalImages((prev) => prev.filter((_, i) => i !== index));
-        alert("❌ ลบรูปภาพย่อยออกจากระบบสำเร็จ");
-      } catch (err) {
-        alert(
-          err instanceof Error ? err.message : "เกิดข้อผิดพลาดในการลบรูปภาพ",
-        );
-      }
       return;
     }
 
-    // เคสที่ 2: ลบรูปพรีวิวที่ผู้ใช้เพิ่งกดเลือกเข้ามาในฟอร์ม (ทั้งหน้าสร้างและหน้าแก้ไข)
+    // รูปใหม่ที่เพิ่งเลือก แต่ยังไม่ได้อัปโหลด
     const isNewConfirmed = window.confirm(
-      "⚠️ คุณต้องการยกเลิกการเลือกรูปภาพประกอบย่อยรูปนี้ใช่หรือไม่?",
+      "⚠️ ต้องการยกเลิกการเลือกรูปภาพนี้หรือไม่?",
     );
+
     if (!isNewConfirmed) return;
 
     const newIndex = index - additionalImages.length;
-    setSubFiles((prev) => prev.filter((_, i) => i !== newIndex));
-    setSubPreviews((prev) => prev.filter((_, i) => i !== newIndex));
+
+    setSubFiles((prev) =>
+      prev.filter((_, fileIndex) => fileIndex !== newIndex),
+    );
+
+    setSubPreviews((prev) =>
+      prev.filter((_, previewIndex) => previewIndex !== newIndex),
+    );
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -169,6 +164,11 @@ export default function BlogFormContainer({
       // EDIT MODE
       // =========================
       if (isEditMode) {
+        const targetBlogId = initialData?.id ?? blogId;
+
+        if (!targetBlogId) {
+          throw new Error("ไม่พบรหัสบทความที่ต้องการแก้ไข");
+        }
         const updatePayload: UpdateBlogPayload = {};
 
         if (title !== initialData?.title) updatePayload.title = title;
@@ -177,7 +177,10 @@ export default function BlogFormContainer({
         if (content !== initialData?.content) updatePayload.content = content;
 
         const hasTextChanged = Object.keys(updatePayload).length > 0;
-        const hasImageChanged = coverFile !== null || subFiles.length > 0;
+        const hasImageChanged =
+          coverFile !== null ||
+          subFiles.length > 0 ||
+          deletedImageIds.length > 0;
 
         if (!hasTextChanged && !hasImageChanged) {
           alert("ℹ️ [INFO] ไม่พบข้อมูลที่มีการเปลี่ยนแปลงในระบบฟอร์ม");
@@ -187,7 +190,7 @@ export default function BlogFormContainer({
 
         // แก้ไขข้อมูลบทความหลัก
         if (hasTextChanged) {
-          const res = await fetch(`${API_URL}/blogs/${initialData?.id}`, {
+          const res = await fetch(`${API_URL}/blogs/${targetBlogId}`, {
             method: "PATCH",
             headers: {
               Authorization: `Bearer ${token}`,
@@ -199,13 +202,34 @@ export default function BlogFormContainer({
           if (!res.ok) throw new Error("บันทึกการแก้ไขข้อมูลบทความไม่สำเร็จ");
         }
 
+        // ลบรูปภาพย่อยที่ผู้ใช้เลือกนำออก
+        if (deletedImageIds.length > 0) {
+          for (const imageId of deletedImageIds) {
+            const deleteRes = await fetch(
+              `${API_URL}/blogs/images/${imageId}`,
+              {
+                method: "DELETE",
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                },
+              },
+            );
+
+            const deleteData = await deleteRes.json().catch(() => null);
+
+            if (!deleteRes.ok) {
+              throw new Error(deleteData?.message || "ลบรูปภาพประกอบไม่สำเร็จ");
+            }
+          }
+        }
+
         // อัปโหลดรูปปกใหม่
         if (coverFile) {
           const coverFormData = new FormData();
           coverFormData.append("coverImage", coverFile);
 
           const coverRes = await fetch(
-            `${API_URL}/blogs/${initialData?.id}/upload-cover`,
+            `${API_URL}/blogs/${targetBlogId}/upload-cover`,
             {
               method: "POST",
               headers: { Authorization: `Bearer ${token}` },
@@ -224,7 +248,7 @@ export default function BlogFormContainer({
           });
 
           const imageRes = await fetch(
-            `${API_URL}/blogs/${initialData?.id}/upload-images`,
+            `${API_URL}/blogs/${targetBlogId}/upload-images`,
             {
               method: "POST",
               headers: { Authorization: `Bearer ${token}` },
@@ -243,6 +267,7 @@ export default function BlogFormContainer({
         alert("🎉 บันทึกการแก้ไขข้อมูลสำเร็จเรียบร้อย!");
         setSubFiles([]);
         setSubPreviews([]);
+        setDeletedImageIds([]);
       }
 
       // =========================
@@ -263,9 +288,17 @@ export default function BlogFormContainer({
           }),
         });
 
-        if (!res.ok) throw new Error("สร้างบทความไม่สำเร็จ");
+        const responseData = await res.json().catch(() => null);
 
-        const createdBlog = await res.json();
+        if (!res.ok) {
+          const message = Array.isArray(responseData?.message)
+            ? responseData.message.join(", ")
+            : responseData?.message;
+
+          throw new Error(message || `สร้างบทความไม่สำเร็จ (${res.status})`);
+        }
+
+        const createdBlog = responseData;
 
         if (createdBlog.id && coverFile) {
           const coverFormData = new FormData();
